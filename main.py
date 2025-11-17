@@ -1,6 +1,11 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import EmailStr
+from typing import Optional
+
+from schemas import ContactMessage
+from database import create_document
 
 app = FastAPI()
 
@@ -63,6 +68,22 @@ def test_database():
     response["database_name"] = "✅ Set" if os.getenv("DATABASE_NAME") else "❌ Not Set"
     
     return response
+
+@app.post("/contact")
+def submit_contact(
+    name: str = Form(...),
+    email: EmailStr = Form(...),
+    message: str = Form(...),
+    source: Optional[str] = Form("website"),
+):
+    """Accept contact form submissions and store in MongoDB."""
+    try:
+        payload = ContactMessage(name=name, email=email, message=message, source=source)
+        collection_name = payload.__class__.__name__.lower()  # "contactmessage"
+        inserted_id = create_document(collection_name, payload)
+        return {"ok": True, "id": inserted_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 if __name__ == "__main__":
